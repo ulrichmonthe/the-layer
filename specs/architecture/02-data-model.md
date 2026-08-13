@@ -15,7 +15,9 @@ Postgres + pgvector (ADR-0001). Every table carries `org_id` (tenant isolation, 
 ## B. Document corpus
 
 **documents** — every ingested file.
-`id, org_id, kind enum('proposal','report','budget','financial_statement','990','letter','other'), title, source enum('upload','email','drive'), storage_key, mime, status enum('uploaded','extracting','extracted','failed'), fiscal_year int null, funder_id null`
+`id, org_id, kind enum('proposal','report','budget','financial_statement','990','letter','other'), domain enum('governance','legal','finance','hr','insurance','program','grant'), title, source enum('upload','email','drive'), storage_key, mime, status enum('uploaded','extracting','extracted','failed'), fiscal_year int null, funder_id null, valid_from date null, valid_until date null`
+
+`kind` is what the document *is*; `domain` is which part of the organisation it belongs to (ADR-0008). Both are facets on one corpus — `domain` is a label, never a permission boundary, and never a second tenancy key. Extraction proposes `domain`; a human confirms it, like any other candidate. `valid_until` is set only for documents that expire (insurance certificates, registrations, audits) and drives the assembly gap list.
 
 **document_chunks** — retrieval units.
 `id, document_id, seq, text, page_start, page_end, embedding vector(1536), token_count`
@@ -66,6 +68,17 @@ Principle: entities give stable identity; facts give attributed values. UI displ
 **reports** — `id, award_id, due date, status enum('upcoming','drafting','review','submitted'), document_id null`
 **tasks / approvals** — `tasks(id, org_id, title, due, assignee_id, related_type, related_id, status)` · `approvals(id, org_id, subject_type enum('draft_export','outbound_email','report_submission'), subject_id, approved_by, approved_at)` — an outbound action without an approval row must be impossible at the code level, not just the UI level.
 
+### Document assembly (ADR-0008)
+
+**requirements** — a document the funder asks to be attached to an application.
+`id, org_id, opportunity_id, label, doc_domain null, doc_kind null, required bool default true, notes text null`
+`doc_domain`/`doc_kind` are hints used to suggest candidate documents; they do not constrain what may be attached.
+
+**attachments** — a document satisfying a requirement.
+`id, org_id, requirement_id, document_id, attached_by, attached_at`
+
+The gap list is **derived, never stored**: a required requirement with no attachment row is *missing*; an attached document whose `valid_until` has passed or falls inside the org's warning window is *expiring*. This is date arithmetic and null checks — never an LLM inference (constraint 4 in 00-overview). In v1 gaps **flag**; they do not block export. Blocking requires a new ADR.
+
 ## G. Artifacts (reasoning outputs)
 
 **drafts** — `id, org_id, opportunity_id, kind enum('narrative','budget','report','loi'), content jsonb (block-structured), status enum('generating','review','accepted','exported'), prompt_version, model`
@@ -77,3 +90,5 @@ Rule (enforced by eval gate AND a DB check in the export path): a draft cannot r
 1. Do outcome metrics need standardized taxonomy mapping (e.g., to IRIS+) or free-form v1? Lean: free-form v1.
 2. Funder records: global shared table with org-level overlay vs per-org? v1: per-org (simpler, no cross-tenant leakage risk); revisit when we add a funder database.
 3. Budget template mapping storage (funder template ↔ budget_lines mapping memory) — schema TBD in Phase 4 planning.
+4. Reusable requirement templates: most funders ask for the same handful of attachments. Per-opportunity `requirements` rows only (today) vs an org-level template a new opportunity is seeded from. Lean: add templates once we have seen real funder checklists, not before. (ADR-0008)
+5. How long is the expiry warning window, and is it per-org or global? Lean: org-level setting in `organizations.settings`, defaulting to 60 days. (ADR-0008)

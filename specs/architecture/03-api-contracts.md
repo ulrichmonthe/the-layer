@@ -20,6 +20,8 @@ Conventions: all procedures scoped by authenticated org; errors are typed (`NOT_
 - `core.getOrgProfile() → { organization, programs[], outcomes[], budgetLines[] }` — verified facts only.
 - `core.getFact(factId) → Fact & { sources: SourceRef[] }` — powers provenance popovers.
 - `core.search(query, filters?) → { chunks: ChunkHit[], facts: FactHit[] }` — hybrid retrieval (vector + keyword + fact lookup). Used by reasoning AND by the UI's "ask the brain" box. Same ranking code path for both — no divergence.
+  - `filters` accepts `domain?: Domain[]` (ADR-0008). It narrows one shared index; it does not select a different index or ranking path.
+- `core.documents.list(filters?: { domain?, kind?, expiringBefore?, funderId? }) → Document[]` — the shelf view behind "show me our insurance certificates".
 - `core.funders.list/get/upsert`, `core.interactions.log(...)` — funder graph CRUD.
 
 ## reasoning.* (all stateless; all return artifacts referencing fact IDs)
@@ -41,6 +43,15 @@ Conventions: all procedures scoped by authenticated org; errors are typed (`NOT_
 - `workflow.tasks.*` — CRUD + assign.
 - `workflow.approvals.request(subjectType, subjectId) → Approval(pending)` · `workflow.approvals.grant(approvalId)`
   - Export/send procedures REQUIRE a granted approval id; they fail with `APPROVAL_REQUIRED` otherwise. This is checked server-side.
+
+### workflow.assembly.* (ADR-0008)
+
+- `workflow.assembly.listRequirements(opportunityId) → Requirement[]`
+- `workflow.assembly.upsertRequirement({ opportunityId, label, docDomain?, docKind?, required?, notes? }) → Requirement`
+- `workflow.assembly.attach(requirementId, documentId) → Attachment` · `workflow.assembly.detach(attachmentId) → void`
+- `workflow.assembly.suggest(requirementId) → Document[]` — candidate documents ranked by `doc_domain`/`doc_kind` hint and recency. A ranked shortlist, not an auto-attach.
+- `workflow.assembly.gaps(opportunityId) → { missing: Requirement[], expiring: { requirement, document, validUntil }[], satisfied: { requirement, document }[] }`
+  - Contract: computed from `attachments` and `documents.valid_until` at call time. Deterministic — no model call in this path. Gaps are advisory in v1: a non-empty `missing` does **not** block export (contrast `translateBudget`, where a non-zero delta does).
 - `workflow.nudges.preview() → Nudge[]` — what tomorrow's scan would send; used for the settings/trust UI.
 
 ## experience-layer obligations (not an API, but contractual)

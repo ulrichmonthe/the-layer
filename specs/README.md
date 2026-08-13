@@ -24,7 +24,8 @@ specs/
 │   ├── 0004-provenance-model.md
 │   ├── 0005-llm-gateway.md
 │   ├── 0006-typescript-monorepo.md
-│   └── 0007-background-jobs-inngest.md
+│   ├── 0007-background-jobs-inngest.md
+│   └── 0008-document-domains-and-assembly.md
 └── agents/
     ├── AGENTS.md                    ← copy to the ROOT of the code repo
     └── architect-instructions.md    ← paste into the Claude "Architect" Project

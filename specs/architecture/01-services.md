@@ -13,7 +13,7 @@ packages/
   ingestion/      upload handling, extraction orchestration, confirmation queue
   core/           knowledge core: schema, repositories, fact/provenance/conflict logic
   reasoning/      match, draft, translate, triage engines (stateless)
-  workflow/       pipeline, deadlines, tasks, approvals, nudge scheduling
+  workflow/       pipeline, deadlines, tasks, approvals, assembly, nudge scheduling
   llm/            gateway client, prompt registry, retrieval utilities
   evals/          Braintrust suites, golden datasets, scorers
   shared/         types, zod schemas, errors, config
@@ -36,7 +36,7 @@ packages/
 | `document.extract` | ingestion | vendor call, retries, confidence scoring |
 | `facts.candidates_ready` | ingestion | conflict detection vs existing facts; build confirmation queue |
 | `draft.requested` | reasoning | long-running; streams progress to UI |
-| `nudge.scan` (cron) | workflow | daily: find due deadlines/stale tasks → compose nudges |
+| `nudge.scan` (cron) | workflow | daily: find due deadlines/stale tasks, plus expiring documents and open assembly gaps (ADR-0008) → compose nudges |
 | `nudge.send` | workflow | requires approval record if outbound to third party |
 | `corpus.reindex` | core | re-embed on chunking/prompt-version change |
 
